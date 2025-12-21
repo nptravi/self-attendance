@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Attendance Management System for Self</title>
+<style>
+    body{font-family:sans-serif;margin:10px;}
+    h1,h2{margin:0 0 10px;}
+    #loginDiv,#contentDiv{margin-top:20px;}
+    input,select,button{padding:5px;margin:2px;}
+    button{cursor:pointer;}
+    .attendance-select{min-width:60px; max-width:120px; font-size:1rem;}
+    table{border-collapse:collapse; width:100%;}
+    th,td{border:1px solid #ccc; padding:5px; text-align:center;}
+    .calendar{display:grid; grid-template-columns:repeat(7,1fr); gap:5px; margin-top:10px;}
+    .calendar-day{border:1px solid #ccc; padding:5px; min-height:30px; position:relative; cursor:pointer;}
+    .calendar-day sup{font-size:0.8em; position:relative; top:2px; right:2px; color:#666;}
+    .calendar-day span{font-size:1.2em; font-weight:bold; position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);}
+    .gridview_button{position: absolute; left: 0%;}
+    .calendarview_button{position: absolute; left: 0%;}
+    .download_button{position: absolute;right: 0%; }
+    #viewSelector button{margin-right:5px;}
+</style>
+</head>
+<body>
+    
+<div id="loginDiv">
+    <h2 id="formTitle">Login</h2>
+    <input type="text" id="username" placeholder="Username" ><br><br>
+    <input type="password" id="password" placeholder="Password" onkeydown="form_submit(event)"><br><br>
+    <div id="adminDiv" style="display:none;">
+        <input type="password" id="admin_password" placeholder="Admin Password"><br><br>
+    </div>
+    <label><input type="checkbox" id="rememberMe"> Remember Me</label><br><br>
+    <button id="submitBtn" onclick="form_click_submit()">Login</button>
+    <br>
+    <button onclick="toggleSignup()" id="toggleBtn">Sign Up</button>
+</div>
+
+<div id="contentDiv" style="display:none;">
+    <table border="none">
+        <tr>
+            <td><h2 style="text-align: center;">Self Attendance System</h2></td>
+            <td>
+                <span id="welcome_user">Welcome</span><br>
+                <button onclick="logout()">Logout</button>
+            </td>
+        </tr>
+    </table>
+
+    <div id="viewSelector" style="display: flex; justify-content: center; width:100%; " >
+        <button id="btn_grid" class="gridview_button" onclick="setView('grid')">Grid View</button>
+        <button id="btn_calendar" class="calendarview_button" onclick="setView('calendar')">Calendar View</button>
+        <button class="download_button" onclick="downloadCSV()">Download CSV</button>
+        <button id="btn_previous" onclick="prev_month()">Previous</button>
+        <span id="month_holder" style="font-size: 18px; font-weight: bold;"></span>
+        <button id="btn_next" onclick="next_month()">Next</button>
+    </div>
+    <div id="attendanceContainer"></div>
+</div>
+
+<script>
+let view='calendar'; // Fixed typo
+let attendance={};
+let signupMode=false;
+let cursorMonth=new Date().getMonth();
+let cursorYear=new Date().getFullYear();
+let start_date = new Date(cursorYear,cursorMonth,1);
+let today = new Date();
+
+function toggleSignup(){
+    signupMode = !signupMode;
+    document.getElementById('adminDiv').style.display = signupMode ? 'block':'none';
+    document.getElementById('formTitle').innerText = signupMode ? 'Sign Up':'Login';
+    document.getElementById('submitBtn').innerText = signupMode ? 'Sign Up':'Login';
+    document.getElementById('toggleBtn').innerText = signupMode ? 'Back to Login':'Sign Up';
+}
+
+function form_submit(event) {
+    if(event.key ==='Enter') {
+        if(signupMode) signup();
+        else login();
+    }
+}
+
+function form_click_submit() {
+    if(signupMode) signup();
+    else login();
+}
+
+function login(){
+    const username=document.getElementById('username').value.trim();
+    const password=document.getElementById('password').value.trim();
+    const remember=document.getElementById('rememberMe').checked;
+    fetch('api/login.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({username,password,remember}),
+        credentials:'include'
+    }).then(r=>r.json()).then(d=>{
+        if(d.success) checkSession();
+        else alert('Invalid credentials');
+    });
+}
+
+function signup(){
+    const username=document.getElementById('username').value.trim();
+    const password=document.getElementById('password').value.trim();
+    const admin_password=document.getElementById('admin_password').value.trim();
+    fetch('api/create_user.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({username,password,admin_password}),
+        credentials:'include'
+    }).then(r=>r.json()).then(d=>{
+        if(d.success){alert('User created. Please login.'); toggleSignup();}
+        else alert(d.message || 'Signup failed');
+    });
+}
+
+function checkSession(){
+    fetch('api/check_session.php',{credentials:'include'})
+    .then(r=>r.json()).then(d=>{
+        if(d.loggedIn) {
+            document.getElementById('loginDiv').style.display='none';
+            document.getElementById('contentDiv').style.display='block';
+            document.getElementById('welcome_user').textContent='Welcome '+d.userName;
+            loadAttendance();
+        } else {
+            document.getElementById('loginDiv').style.display='block';
+            document.getElementById('contentDiv').style.display='none';
+        }
+    }).catch(err => console.error("Session check failed", err));
+}
+
+function logout(){
+    fetch('api/logout.php',{credentials:'include'}).then(()=>{
+        window.location.reload(); // Refresh to clear all states
+    });
+}
+
+function setView(v){
+    view=v;
+    renderView();
+}
+
+function formatDateLocal(date){
+    const y=date.getFullYear();
+    const m=String(date.getMonth()+1).padStart(2,'0');
+    const d=String(date.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+}
+
+function prev_month() {
+    cursorMonth--;
+    if(cursorMonth<0) { cursorMonth=11; cursorYear--; } 
+    start_date = new Date(cursorYear,cursorMonth,1);
+    loadAttendance();
+}
+
+function next_month() {
+    cursorMonth++;
+    if(cursorMonth>11) { cursorMonth=0; cursorYear++; } 
+    start_date = new Date(cursorYear,cursorMonth,1);
+    loadAttendance();
+}
+
+function loadAttendance(){
+    const from_dt=formatDateLocal(new Date(cursorYear,cursorMonth,1));
+    const to_dt = formatDateLocal(new Date(cursorYear,cursorMonth+1,0));
+    fetch(`api/get_attendance.php?from=${from_dt}&to=${to_dt}`,{credentials:'include'})
+    .then(r=>r.json())
+    .then(d=>{
+        attendance = d;
+        renderView();
+    });
+}
+
+function renderView(){
+    const container=document.getElementById('attendanceContainer');
+    if(!container) return;
+    container.innerHTML='';
+    const month_holder = document.getElementById('month_holder');
+    const options = { month: 'long', year: 'numeric' };  
+    month_holder.textContent= start_date.toLocaleString('en-US', options);   
+    
+    if(view === 'grid') {
+        document.getElementById('btn_grid').style.display='none';
+        document.getElementById('btn_calendar').style.display='block';
+        renderGrid(container);
+    } else {
+        document.getElementById('btn_grid').style.display='block';
+        document.getElementById('btn_calendar').style.display='none';
+        renderCalendar(container);
+    }
+}
+
+function renderGrid(container){
+    const table=document.createElement('table');
+    const trHead=document.createElement('tr');
+    ['Date','Day','Attendance'].forEach(h=>{
+        const th=document.createElement('th'); th.innerText=h; trHead.appendChild(th);
+    });
+    table.appendChild(trHead);
+
+    let end_date = new Date(cursorYear,cursorMonth+1,0);
+    let limit_date = end_date < today ? end_date.getDate() : today.getDate();
+    
+    // If viewing a past month, show all days. If current month, show up to today.
+    const isCurrentMonth = (cursorYear === today.getFullYear() && cursorMonth === today.getMonth());
+    const daysToShow = isCurrentMonth ? today.getDate() : end_date.getDate();
+
+    for(let i=daysToShow; i>0; i--){
+        const d=new Date(cursorYear,cursorMonth,i); 
+        const date=formatDateLocal(d);
+        const day=d.toLocaleDateString('en-US',{weekday:'short'});
+        const tr=document.createElement('tr');
+        
+        tr.innerHTML = `<td>${date}</td><td>${day}</td>`;
+        const tdAtt=document.createElement('td');
+        tdAtt.innerText = attendance[date] || '';
+        tdAtt.style.cursor = 'pointer';
+
+        tdAtt.onclick = function() {
+            if (this.querySelector('select')) return;
+            const select = createAttendanceSelect(date, attendance[date]);
+            this.innerHTML = '';
+            this.appendChild(select);
+            setTimeout(() => select.focus(), 50);
+        };
+
+        tr.appendChild(tdAtt);
+        table.appendChild(tr);
+    }    
+    container.appendChild(table);
+    toggleNextButton();
+}
+
+function renderCalendar(container){
+    const firstDay=new Date(cursorYear,cursorMonth,1).getDay();
+    const lastDate=new Date(cursorYear,cursorMonth+1,0).getDate();
+    const cal=document.createElement('div'); cal.className='calendar';
+
+    const weekdays=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    weekdays.forEach(wd => {
+        let div = document.createElement('div');
+        div.style.fontWeight = 'bold';
+        div.innerText = wd;
+        cal.appendChild(div);
+    });
+
+    for(let i=0;i<firstDay;i++){cal.appendChild(document.createElement('div'));}
+
+    for(let d=1;d<=lastDate;d++){
+        const dateobj = new Date(cursorYear,cursorMonth,d);
+        const dateStr=formatDateLocal(dateobj);
+        const code=attendance[dateStr]||'';
+        const div=document.createElement('div'); div.className='calendar-day';
+        div.innerHTML=`<sup>${d}</sup><br><span>${code}</span>`;
+        
+        if(dateobj <= today) {
+            div.onclick = function() {
+                if (this.querySelector('select')) return;
+                const select = createAttendanceSelect(dateStr, code);
+                this.innerHTML = `<sup>${d}</sup>`;
+                this.appendChild(select);
+                setTimeout(() => select.focus(), 50);
+            };
+        }
+        cal.appendChild(div);
+    }
+    container.appendChild(cal);
+    toggleNextButton();
+}
+
+// Helper to create the select element for both views
+function createAttendanceSelect(date, currentVal) {
+    const select = document.createElement('select');
+    select.className = 'attendance-select';
+    select.dataset.date = date;
+    
+    ['', 'A', 'B', 'C', 'G', 'O', 'L', 'HL', 'TR'].forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c; opt.innerText = c; 
+        if (currentVal === c) opt.selected = true;
+        select.appendChild(opt);
+    });
+
+    select.onclick = (e) => e.stopPropagation();
+    
+    // Update on change
+    select.onchange = function() {
+        updateAttendance(this);
+    };
+
+    // Revert on blur
+    select.onblur = function() {
+        setTimeout(() => renderView(), 200);
+    };
+
+    return select;
+}
+
+function updateAttendance(select){ 
+    const code=select.value;
+    const date=select.dataset.date;
+    
+    // Update local immediately for mobile responsiveness
+    attendance[date] = code;
+    renderView();
+
+    fetch('api/update_attendance.php',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({'date':date,'code':code}),
+        credentials:'include'
+    }).then(r=>r.json()).then(d=>{
+        if(!d.success) alert(d.message + ' Update failed');
+    });
+}
+
+function toggleNextButton() {
+    const isPast = (cursorYear < today.getFullYear()) || (cursorYear === today.getFullYear() && cursorMonth < today.getMonth());
+    document.getElementById('btn_next').style.display = isPast ? 'block' : 'none';
+}
+
+function downloadCSV(){
+    const rows=[['Date','Attendance']];
+    Object.keys(attendance).sort().forEach(date=>{
+        rows.push([date,attendance[date]]);
+    });
+    let csv=''; rows.forEach(r=>{csv+=r.join(',')+'\n';});
+    const blob=new Blob([csv],{type:'text/csv'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='attendance.csv'; a.click();
+}
+
+checkSession();
+</script>
+</body>
+</html>

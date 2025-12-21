@@ -1,0 +1,5 @@
+DB_HOST=Host
+DB_USER=username
+DB_PASS=password
+DB_NAME=database_name
+ADMIN_PASSWORD=admin_password_for_webapp

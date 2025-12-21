@@ -1,0 +1,6 @@
+.env
+*~
+dbconfig.json
+.vscode/sftp.json
+Work Flow_v2.txt
+api/test.php

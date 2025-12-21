@@ -1,5 +1,3 @@
----
-
 # Self Attendance Management System
 
 A lightweight, single-page web application to track daily attendance, featuring a "Remember Me" login system, dual-view interface, and CSV export functionality.
@@ -95,7 +93,3 @@ To create a new account:
 * `logout.php` - Clears sessions and expires cookies.
 * `get_attendance.php` - Fetches records for the selected date range.
 * `update_attendance.php` - Saves or updates specific attendance entries.
-
-
-
----

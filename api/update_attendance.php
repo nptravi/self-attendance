@@ -9,15 +9,12 @@ $ret = [];
 $ret["message"]= 'User_id found.';
 $ret["success"]=false;
 $data = json_decode(file_get_contents("php://input"), true);
-//$ret["message"] = $ret["message"]."data=".json_encode($data); 
-//echo json_encode($ret);
-//exit;
+
 $date = $data["date"] ?? null;
 $code = $data["code"] ?? '';
 $ret["message"] = $ret["message"]."date:".$_POST["date"]; 
 $ret["message"] = $ret["message"]."code:".$_POST["code"]; 
-//echo json_encode($ret);
-//exit;
+
 if (!$date) {
     $ret["message"] = $ret["message"].' date value is mandatory. Post parameters: '+json_encode($data);
     echo json_encode($ret);

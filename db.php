@@ -1,38 +1,25 @@
 <?php
-// No whitespace before <?php
 error_reporting(E_ERROR | E_PARSE);
 ini_set('display_errors', 0);
 header('Content-Type: application/json');
 
 global $ENV;
 $ENV = [];
-//echo 'from db.php';
+
 // Load environment
 if(file_exists(__DIR__ . '/.env')){
     $lines = file(__DIR__ . '/.env', FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach($lines as $line){
         if(strpos(trim($line),'#')===0) continue;
         [$key,$val] = explode('=', $line,2);
-        $ENV[trim($key)]=trim($val);
-        //echo 'putenv args: '.trim($key).'='.trim($val).'<br>';
-        putenv(trim($key).'='.trim($val));
-        //echo 'getenv result: '.getenv($key).'<br>';
-        
-        
+        $ENV[trim($key)]=trim($val);        
     }
 }
-
-// $host = getenv('DB_HOST') ?: 'localhost';
-// $user = getenv('DB_USER') ?: 'root';
-// $pass = getenv('DB_PASS') ?: '';
-// $dbname = getenv('DB_NAME') ?: 'self_attendance';
 
 $host = $ENV['DB_HOST'];
 $user = $ENV['DB_USER']; 
 $pass = $ENV['DB_PASS'];
 $dbname = $ENV['DB_NAME'];
-
-//echo "dbName: ".$dbname."<br>";
 
 // Connect MySQL
 $conn = new mysqli($host,$user,$pass);

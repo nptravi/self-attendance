@@ -2,5 +2,5 @@
 *~
 *.json
 .vscode*
-Work Flow_v2.txt
+Work Flow*.txt
 api/test.php

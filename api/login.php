@@ -18,7 +18,6 @@ $stmt->execute();
 $result = $stmt->get_result();
 
 $ret = ['success' => false, 'message' => 'dbquery ran successfully'];
-//$ret['message'] = $ret['message'] . 'remember_me value: ' . $remember;
 
 if ($row = $result->fetch_assoc()) {
     if (password_verify($password, $row['password'])) {
